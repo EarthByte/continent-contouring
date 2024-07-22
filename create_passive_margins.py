@@ -66,7 +66,7 @@ max_distance_of_subduction_zone_from_active_margin_kms = 500
 max_distance_of_subduction_zone_from_active_margin_radians = max_distance_of_subduction_zone_from_active_margin_kms / pygplates.Earth.mean_radius_in_kms
 
 # The grid spacing (in degrees) between points in the grid used for contouring/aggregrating blocks of continental polygons.
-continent_contouring_point_spacing_degrees = 0.25
+continent_contouring_point_spacing_degrees = 0.1
 
 # Optional parameter specifying a minimum area threshold (in square radians) for including contoured continents.
 #
@@ -93,9 +93,21 @@ continent_contouring_area_threshold_steradians = continent_contouring_area_thres
 # Note: Units here are for normalised sphere (ie, steradians or square radians) so full Earth area is 4*pi.
 #       So 0.1 covers an area of approximately 4,000,000 km^2 (ie, 0.1 * 6371^2, where Earth radius is 6371km).
 #       Conversely 4,000,000 km^2 is equivalent to (4,000,000 / 6371^2) steradians.
-continent_exclusion_area_threshold_square_kms = 800000
-continent_exclusion_area_threshold_steradians = continent_exclusion_area_threshold_square_kms / (pygplates.Earth.mean_radius_in_kms * pygplates.Earth.mean_radius_in_kms)
+def get_continent_exclusion_area_threshold_steradians(time):
+    if time > 1450:
+        continent_exclusion_area_threshold_square_kms = 3500000
 
+    elif time > 1400:
+        # Linearly interpolate between 1450 and 1400 Ma.
+        interp = float(time - 1400) / (1450 - 1400)
+        continent_exclusion_area_threshold_square_kms = interp * 3500000 + (1 - interp) * 900000
+    
+    else:
+        continent_exclusion_area_threshold_square_kms = 900000
+
+    continent_exclusion_area_threshold_steradians = continent_exclusion_area_threshold_square_kms / (pygplates.Earth.mean_radius_in_kms * pygplates.Earth.mean_radius_in_kms)
+    return continent_exclusion_area_threshold_steradians
+    
 # Optional parameter specifying the distance threshold (in radians) above which continents are separated.
 #
 # Any continent polygons separated by a distance that is less than this threshold will become part of the same continent.
@@ -108,7 +120,17 @@ continent_exclusion_area_threshold_steradians = continent_exclusion_area_thresho
 #
 #continent_separation_distance_threshold_kms = 0
 #continent_separation_distance_threshold_radians = continent_separation_distance_threshold_kms / pygplates.Earth.mean_radius_in_kms
-continent_separation_distance_threshold_radians = continent_contours.DEFAULT_CONTINENT_SEPARATION_DISTANCE_THRESHOLD_RADIANS
+def get_continent_separation_distance_threshold_radians(time):
+    if time > 1450:
+        # At times >1450, we need higher sep distance because this will make sure that 
+        continent_separation_distance_threshold_radians = 0.30 #1 #continent_contours.DEFAULT_CONTINENT_SEPARATION_DISTANCE_THRESHOLD_RADIANS
+    elif time > 1400:
+        # Linearly interpolate between 1450 and 1400 Ma.
+        interp = float(time - 1400) / (1450 - 1400)
+        continent_separation_distance_threshold_radians = interp * 0.30 + (1 - interp) * 0.001
+    else:
+        continent_separation_distance_threshold_radians = 0.001
+    return continent_separation_distance_threshold_radians
 
 # Optional parameter specifying a distance (in radians) to expand contours ocean-ward - this also
 # ensures small gaps between continents are ignored during contouring.
@@ -127,17 +149,23 @@ continent_separation_distance_threshold_radians = continent_contours.DEFAULT_CON
 #       So 1.0 radian is approximately 6371 km (where Earth radius is 6371 km).
 #       Also 1.0 degree is approximately 110 km.
 def continent_contouring_buffer_and_gap_distance_radians(time, contoured_continent):
-    # One distance for time interval [1000, 300] and another for time interval [250, 0].
-    # And linearly interpolate between them over the time interval [300, 250].
-    pre_pangea_distance_radians = math.radians(2.5)  # convert degrees to radians
+    # One distance for time interval [1000, 300] and another for time interval [200, 0].
+    # And linearly interpolate between them over the time interval [300, 200].
+    pre_pangea_distance_radians = math.radians(2.25)  # convert degrees to radians
     post_pangea_distance_radians = math.radians(0.0)  # convert degrees to radians
-    if time > 300:
+    if time > 1450:
+        buffer_and_gap_distance_radians = math.radians(3.5)
+    elif time > 1400:
+        # Linearly interpolate between 1450 and 1400 Ma.
+        interp = float(time - 1400) / (1450 - 1400)
+        buffer_and_gap_distance_radians = interp * math.radians(3.5) + (1 - interp) * pre_pangea_distance_radians
+    elif time > 300:
         buffer_and_gap_distance_radians = pre_pangea_distance_radians
-    elif time < 250:
+    elif time < 200:
         buffer_and_gap_distance_radians = post_pangea_distance_radians
     else:
         # Linearly interpolate between 250 and 300 Ma.
-        interp = float(time - 250) / (300 - 250)
+        interp = float(time - 200) / (300 - 200)
         buffer_and_gap_distance_radians = interp * pre_pangea_distance_radians + (1 - interp) * post_pangea_distance_radians
     
     # Area of the contoured continent.
