@@ -6,7 +6,7 @@ import numpy as np
 import os
 import os.path
 import pygplates
-from ptt import continent_contours
+from gplately.ptt import continent_contours
 
 
 #############################
@@ -141,7 +141,7 @@ def continent_separation_distance_threshold_radians(time):
 # This parameter can also be a function (that returns the distance).
 # The function can have a single function argument: (1) accepting time (in Ma).
 # Or it can have two function arguments: (1) the first accepting time (in Ma) and
-# (2) the second accepting the contoured continent (a 'ptt.continent_contours.ContouredContinent' object)
+# (2) the second accepting the contoured continent (a 'gplately.ptt.continent_contours.ContouredContinent' object)
 # of the (unexpanded) contoured continent that the buffer/gap distance will apply to.
 # Hence a function with *two* arguments means a different buffer/gap distance can be specified for each contoured continent (eg, based on its area).
 #

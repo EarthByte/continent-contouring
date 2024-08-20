@@ -1,9 +1,9 @@
 # Continent contouring
 
-Included are some workflows that use continent contouring from [`PlateTectonicTools`](https://github.com/EarthByte/PlateTectonicTools). This essentially amounts to creating a `ContinentContouring` object using rotation files, some continent/craton features (polygons), a contour resolution to determine how finely tessellated the contour outlines should be, a buffer/gap threshold to expand continents outward, and two area thresholds to separately exclude small continental islands and small oceanic islands. It will then reconstruct the polygons to an `age` and contour them into continents. This will output the continent contours (as *polyline* continental-oceanic boundaries) and/or continent masks (a 2D NumPy boolean array of continental crust at each age):
+Included are some workflows that use continent contouring from [`GPlately`](https://github.com/GPlates/gplately). This essentially amounts to creating a `ContinentContouring` object using rotation files, some continent/craton features (polygons), a contour resolution to determine how finely tessellated the contour outlines should be, a buffer/gap threshold to expand continents outward, and two area thresholds to separately exclude small continental islands and small oceanic islands. It will then reconstruct the polygons to an `age` and contour them into continents. This will output the continent contours (as *polyline* continental-oceanic boundaries) and/or continent masks (a 2D NumPy boolean array of continental crust at each age):
 
 ```
-from ptt.continent_contours import ContinentContouring
+from gplately.ptt.continent_contours import ContinentContouring
 
 continent_contouring = ContinentContouring(...)
 ...
@@ -21,23 +21,13 @@ The following Python packages are required:
 
 - [`gplately`](https://github.com/GPlates/gplately)
 - [`numpy`](http://numpy.org)
-- [`PlateTectonicTools`](https://github.com/EarthByte/PlateTectonicTools)
 - [`pygplates`](http://gplates.org/docs/pygplates/pygplates_getting_started.html#installation)
 
 You can install these with conda:
 
 ```
-conda create -n <conda-environment> -c conda-forge gplately numpy platetectonictools pygplates
-conda activate <conda-environment>
-```
-
-...but until version 0.5 of PlateTectonicTools is available you'll need to install `platetectonictools` from Github:
-
-```
 conda create -n <conda-environment> -c conda-forge gplately numpy pygplates
 conda activate <conda-environment>
-conda install git pip
-pip install git+https://github.com/EarthByte/PlateTectonicTools
 ```
 
 ...where `<conda-environment>` should be replaced with the name of your conda environment.
