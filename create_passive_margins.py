@@ -93,7 +93,7 @@ continent_contouring_area_threshold_steradians = continent_contouring_area_thres
 # Note: Units here are for normalised sphere (ie, steradians or square radians) so full Earth area is 4*pi.
 #       So 0.1 covers an area of approximately 4,000,000 km^2 (ie, 0.1 * 6371^2, where Earth radius is 6371km).
 #       Conversely 4,000,000 km^2 is equivalent to (4,000,000 / 6371^2) steradians.
-def get_continent_exclusion_area_threshold_steradians(time):
+def continent_exclusion_area_threshold_steradians(time):
     if time > 1450:
         continent_exclusion_area_threshold_square_kms = 3500000
 
@@ -120,7 +120,7 @@ def get_continent_exclusion_area_threshold_steradians(time):
 #
 #continent_separation_distance_threshold_kms = 0
 #continent_separation_distance_threshold_radians = continent_separation_distance_threshold_kms / pygplates.Earth.mean_radius_in_kms
-def get_continent_separation_distance_threshold_radians(time):
+def continent_separation_distance_threshold_radians(time):
     if time > 1450:
         # At times >1450, we need higher sep distance because this will make sure that 
         continent_separation_distance_threshold_radians = 0.30 #1 #continent_contours.DEFAULT_CONTINENT_SEPARATION_DISTANCE_THRESHOLD_RADIANS
