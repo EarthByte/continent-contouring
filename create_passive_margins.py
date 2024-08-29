@@ -65,6 +65,9 @@ use_all_cpus = True
 max_distance_of_subduction_zone_from_active_margin_kms = 500
 max_distance_of_subduction_zone_from_active_margin_radians = max_distance_of_subduction_zone_from_active_margin_kms / pygplates.Earth.mean_radius_in_kms
 
+# The directory containing the output files.
+output_dir = 'output'
+
 # The grid spacing (in degrees) between points in the grid used for contouring/aggregrating blocks of continental polygons.
 continent_contouring_point_spacing_degrees = 0.1
 
@@ -184,6 +187,9 @@ def continent_contouring_buffer_and_gap_distance_radians(time, contoured_contine
 ###########################
 
 
+# Create output directory if it doesn't exist.
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
 
 # Rotation model.
 rotation_model = pygplates.RotationModel(rotation_features, default_anchor_plate_id=anchor_plate_id)
@@ -230,7 +236,7 @@ def find_passive_margins(
 
     # Write out the continent mask as NetCDF.
     #
-    continent_mask_filename = 'continent_mask_{}.nc'.format(time)
+    continent_mask_filename = os.path.join(output_dir, 'continent_mask_{}.nc'.format(time))
     # Note that we need to convert the boolean mask grid to a non-boolean number type for NetCDF (and it seems floating-point for gplately).
     continent_mask_grid = continent_mask.astype('float')
     gplately.grids.write_netcdf_grid(continent_mask_filename, continent_mask_grid)
@@ -262,13 +268,16 @@ def find_passive_margins(
         passive_margin_features.append(passive_margin_feature)
 
     # Save continent contours to GPML.
-    pygplates.FeatureCollection(continent_contour_features).write('continent_contour_features_{}.gpml'.format(time))
+    pygplates.FeatureCollection(continent_contour_features).write(
+        os.path.join(output_dir, 'continent_contour_features_{}.gpml'.format(time)))
 
     # Save passive margins to GPML.
-    pygplates.FeatureCollection(passive_margin_features).write('passive_margin_features_{}.gpml'.format(time))
+    pygplates.FeatureCollection(passive_margin_features).write(
+        os.path.join(output_dir, 'passive_margin_features_{}.gpml'.format(time)))
 
     # Save subducton zone segments to GPML (for debugging).
-    pygplates.FeatureCollection(subduction_zone_features).write('subduction_zone_features_{}.gpml'.format(time))
+    pygplates.FeatureCollection(subduction_zone_features).write(
+        os.path.join(output_dir, 'subduction_zone_features_{}.gpml'.format(time)))
 
 
 def _find_passive_margin_geometries_on_contour(
@@ -351,29 +360,32 @@ if __name__ == '__main__':
     passive_margin_features = []
     subduction_zone_features = []
     for time in times:
-        continent_contour_filename = 'continent_contour_features_{}.gpml'.format(time)
+        continent_contour_filename = os.path.join(output_dir, 'continent_contour_features_{}.gpml'.format(time))
         continent_contour_features.extend(pygplates.FeatureCollection(continent_contour_filename))
         # Remove temporary file at current 'time'.
         if os.access(continent_contour_filename, os.R_OK):
             os.remove(continent_contour_filename)
         
-        passive_margin_filename = 'passive_margin_features_{}.gpml'.format(time)
+        passive_margin_filename = os.path.join(output_dir, 'passive_margin_features_{}.gpml'.format(time))
         passive_margin_features.extend(pygplates.FeatureCollection(passive_margin_filename))
         # Remove temporary file at current 'time'.
         if os.access(passive_margin_filename, os.R_OK):
             os.remove(passive_margin_filename)
         
-        subduction_zone_filename = 'subduction_zone_features_{}.gpml'.format(time)
+        subduction_zone_filename = os.path.join(output_dir, 'subduction_zone_features_{}.gpml'.format(time))
         subduction_zone_features.extend(pygplates.FeatureCollection(subduction_zone_filename))
         # Remove temporary file at current 'time'.
         if os.access(subduction_zone_filename, os.R_OK):
             os.remove(subduction_zone_filename)
     
     # Save ALL continent contours to GPMLZ.
-    pygplates.FeatureCollection(continent_contour_features).write('continent_contour_features.gpmlz')
+    pygplates.FeatureCollection(continent_contour_features).write(
+        os.path.join(output_dir, 'continent_contour_features.gpmlz'))
     
     # Save ALL passive margins to GPMLZ.
-    pygplates.FeatureCollection(passive_margin_features).write('passive_margin_features.gpmlz')
+    pygplates.FeatureCollection(passive_margin_features).write(
+        os.path.join(output_dir, 'passive_margin_features.gpmlz'))
 
     # Save ALL subducton zone segments to GPMLZ.
-    pygplates.FeatureCollection(subduction_zone_features).write('subduction_zone_features.gpmlz')
+    pygplates.FeatureCollection(subduction_zone_features).write(
+        os.path.join(output_dir, 'subduction_zone_features.gpmlz'))
