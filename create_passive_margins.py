@@ -13,12 +13,14 @@ from gplately.ptt import continent_contours
 # Start of input parameters #
 #############################
 
-# Location of Merdith et al (2021) 1Ga plate model.
-model_dir = os.path.join('models', 'Merdith_etal_2021_Published')
+# Location of Cao2024 1.8Ga plate model.
+model_dir = os.path.join('/Volumes/Carbon_backup/CONTOURS/Sep11-Cao2024-Original', 'models/1.8Ga_model_2024_07_25')
 
 # Rotation files (relative to input directory).
 rotation_features = [pygplates.FeatureCollection(os.path.join(model_dir, file)) for file in (
-    '1000_0_rotfile_Merdith_et_al.rot',
+    'optimisation/1800_1000_rotfile_20240725_run3.rot',
+    'optimisation/1000_0_rotfile_20240725_run3.rot',
+    #'optimisation/no_net_rotation_model_20240725_run3.rot',
 )]
 
 # The reference frame to generate the output files relative to.
@@ -28,24 +30,24 @@ anchor_plate_id = 0
 #
 # Only include those GPML files that are used for topologies.
 topology_features = [pygplates.FeatureCollection(os.path.join(model_dir, file)) for file in (
-    '250-0_plate_boundaries_Merdith_et_al.gpml',
-    '410-250_plate_boundaries_Merdith_et_al.gpml',
-    '1000-410-Convergence_Merdith_et_al.gpml',
-    '1000-410-Divergence_Merdith_et_al.gpml',
-    '1000-410-Topologies_Merdith_et_al.gpml',
-    '1000-410-Transforms_Merdith_et_al.gpml',
-    'TopologyBuildingBlocks_Merdith_et_al.gpml',
+    '1800-1000_plate_boundaries.gpml',
+    '250-0_plate_boundaries.gpml',
+    '410-250_plate_boundaries.gpml',
+    '1000-410-Convergence.gpml',
+    '1000-410-Divergence.gpml',
+    '1000-410-Topologies.gpml',
+    '1000-410-Transforms.gpml',
+    'TopologyBuildingBlocks.gpml',
 )]
 
 # Continent polygon features (absolute file paths).
 continent_features = [pygplates.FeatureCollection(os.path.join(model_dir, file)) for file in (
-    'shapes_continents_Merdith_et_al.gpml',
-    'shapes_cratons_Merdith_et_al.gpml',
+    'shapes_continents_Cao.gpmlz',
 )]
 
 # Time range.
 start_time = 0
-end_time = 1000
+end_time = 1800
 time_interval = 1
 times = np.arange(start_time, end_time + 0.5 * time_interval, time_interval)
 
@@ -105,8 +107,10 @@ def continent_exclusion_area_threshold_steradians(time):
         interp = float(time - 1400) / (1450 - 1400)
         continent_exclusion_area_threshold_square_kms = interp * 3500000 + (1 - interp) * 900000
     
-    else:
+    elif time > 200:
         continent_exclusion_area_threshold_square_kms = 900000
+    else:
+        continent_exclusion_area_threshold_square_kms = 0
 
     continent_exclusion_area_threshold_steradians = continent_exclusion_area_threshold_square_kms / (pygplates.Earth.mean_radius_in_kms * pygplates.Earth.mean_radius_in_kms)
     return continent_exclusion_area_threshold_steradians
@@ -131,9 +135,94 @@ def continent_separation_distance_threshold_radians(time):
         # Linearly interpolate between 1450 and 1400 Ma.
         interp = float(time - 1400) / (1450 - 1400)
         continent_separation_distance_threshold_radians = interp * 0.30 + (1 - interp) * 0.001
-    else:
+    elif time > 200:
         continent_separation_distance_threshold_radians = 0.001
+    else:
+        continent_separation_distance_threshold_radians = 0
     return continent_separation_distance_threshold_radians
+
+
+# Optional parameter specifying a distance (in radians) to expand contours ocean-ward - this also
+# ensures small gaps between continents are ignored during contouring.
+#
+# The continent(s) will be expanded by a buffer of this distance (in radians) when contouring/aggregrating blocks of continental polygons.
+# If this parameter is not specified then buffer expansion is not applied.
+#
+# This parameter can also be a function (that returns the distance).
+# The function can have a single function argument, accepting time (in Ma).
+# Or it can have two function arguments, with the second accepting the contoured continent (a 'gplately.ptt.continent_contours.ContouredContinent' object)
+# of the (unexpanded) contoured continent that the buffer/gap distance will apply to.
+# Or it can have three function arguments, with the third accepting a list of reconstructed polygons ('pygplates.ReconstructedFeatureGeometry' objects)
+# used to contour the (unexpanded) contoured continent that the buffer/gap distance will apply to.
+# Hence a function with *two* arguments means a different buffer/gap distance can be specified for each contoured continent (eg, based on its area).
+# And a function with *three* arguments can also use the feature properties (eg, plate ID) of the reconstructed polygons in the contoured continent.
+#
+# Note: Units here are for normalised sphere (ie, radians).
+#       So 1.0 radian is approximately 6371 km (where Earth radius is 6371 km).
+#       Also 1.0 degree is approximately 110 km.
+class ContinentContouringBufferAndGapDistanceRadians(object):
+
+
+    #From 1800 to 1400 Ma  use 3.25 degrees.
+    #From 1400 to 1000 Ma linearly interpolate from 3.25 to 2.25 degrees.
+    #From 1000 to 410 Ma  keep 2.25 degrees constant.
+    #From 410 to 200 linearly interpolate between 2.25 degrees to 0 degrees, with the exception of the plate IDs in the attached list, which get interpolated from 2.25deg at 410 Ma to 1.0 deg at 200 Ma.
+    #From 200-0 we use 0 degrees, except for the plate ID list for which we use 1.0 deg.
+
+    # One distance for time interval [1000, 300] and another for time interval [200, 0].
+    # And linearly interpolate between them over the time interval [300, 200].
+    pre_pangea_distance_radians = math.radians(2.25)  # convert degrees to radians
+    post_pangea_distance_radians = math.radians(0.0)  # convert degrees to radians
+    
+    # Plate IDs matching the post-pangea COBs.
+    post_pangea_COB_plate_IDs = [520, 505, 506, 50601, 50602, 590, 591, 61601, 616, 606, 603, 7250, 60302, 64701, 647, 673, 67350, 614, 657, 456, 457, 467, 601, 60201, 612, 61404]
+
+    def __call__(self, time, contoured_continent, continent_feature_polygons):
+        if time >= 1400:
+            buffer_and_gap_distance_radians = math.radians(3.25)
+        elif time >= 1000:
+            interp = float(time - 1000) / (1400 - 1000)
+            buffer_and_gap_distance_radians = interp * math.radians(3.25) + (1 - interp) * self.pre_pangea_distance_radians
+        elif time >= 410:
+            buffer_and_gap_distance_radians = self.pre_pangea_distance_radians
+
+        # From 410 to 200 linearly interpolate between 2.25 degrees to 0 degrees, with the exception of the plate IDs in the attached list, which get interpolated 
+        # from 2.25deg at 410 Ma to 1.0 deg at 200 Ma.
+        elif time >= 200:
+            interp = float(time - 200) / (410 - 200)
+            if self._contoured_continent_has_post_pangea_COBs(continent_feature_polygons):
+                buffer_and_gap_distance_radians = interp * math.radians(2.25) + (1 - interp) * math.radians(1.0)
+            else:
+                buffer_and_gap_distance_radians = interp * math.radians(2.25) + (1 - interp) * self.post_pangea_distance_radians
+        # From 200-0 we use 0 degrees, except for the plate ID list for which we use 1.0 deg.
+        else:  # time <= 200 ...
+            if self._contoured_continent_has_post_pangea_COBs(continent_feature_polygons):
+                buffer_and_gap_distance_radians = math.radians(1.0)
+            else:
+                buffer_and_gap_distance_radians = self.post_pangea_distance_radians
+        
+        # Area of the contoured continent.
+        area_steradians = contoured_continent.get_area()
+
+        # Linearly reduce the buffer/gap distance for contoured continents with area smaller than 1 million km^2.
+        area_threshold_square_kms = 500000
+        area_threshold_steradians = area_threshold_square_kms / (pygplates.Earth.mean_radius_in_kms * pygplates.Earth.mean_radius_in_kms)
+        if area_steradians < area_threshold_steradians:
+            buffer_and_gap_distance_radians *= area_steradians / area_threshold_steradians
+
+        return buffer_and_gap_distance_radians
+
+    def _contoured_continent_has_post_pangea_COBs(self, continent_feature_polygons):
+        # Return true if any polygon in the current contoured continent has a plate ID associated with the post-pangea COBs.
+        for continent_feature_polygon in continent_feature_polygons:
+            if (continent_feature_polygon.get_feature().get_reconstruction_plate_id() in self.post_pangea_COB_plate_IDs):
+                return True
+        
+        return False
+
+
+#continent_contouring_buffer_and_gap_distance_radians = ContinentContouringBufferAndGapDistanceRadians()
+
 
 # Optional parameter specifying a distance (in radians) to expand each individual continental polygon ocean-ward - this also
 # ensures small gaps between continents are ignored during contouring.
@@ -163,35 +252,41 @@ class ContinentPolygonBufferAndGapDistanceRadians(object):
     pre_pangea_distance_radians = math.radians(2.25)  # convert degrees to radians
     post_pangea_distance_radians = math.radians(0.0)  # convert degrees to radians
     # Plate IDs matching the post-pangea COBs.
-    post_pangea_COB_plate_IDs = [101, 201, 701]
+    post_pangea_COB_plate_IDs = [520, 505, 506, 50601, 50602, 590, 591, 61601, 616, 606, 603, 7250, 60302, 64701, 647, 673, 67350, 614, 657, 456, 457, 467, 601, 60201, 612, 61404]
+
+    ignore_ids = [8016, 8013] #Lachlan West, Rocky Cape
 
     def __call__(self, time, continent_feature_polygon):
-        if time > 1450:
-            buffer_and_gap_distance_radians = math.radians(3.5)
-        elif time > 1400:
-            # Linearly interpolate between 1450 and 1400 Ma.
-            interp = float(time - 1400) / (1450 - 1400)
-            buffer_and_gap_distance_radians = interp * math.radians(3.5) + (1 - interp) * self.pre_pangea_distance_radians
-        elif time > 300:
-            buffer_and_gap_distance_radians = self.pre_pangea_distance_radians
-        else:  # time <= 300 ...
-            # If the continent polygon has a plate IDs matching any post-pangea COBs then it does not need
-            # post-pangea buffering - so we can shrink to zero. Otherwise we need to maintain the pre-pangea buffer/gap distance.
-            if continent_feature_polygon.get_feature().get_reconstruction_plate_id() in self.post_pangea_COB_plate_IDs:
-                if time < 200:
-                    buffer_and_gap_distance_radians = self.post_pangea_distance_radians
-                else:  # 200 <= time <= 300 ...
-                    # Linearly interpolate between 200 and 300 Ma.
-                    interp = float(time - 200) / (300 - 200)
-                    buffer_and_gap_distance_radians = interp * self.pre_pangea_distance_radians + (1 - interp) * self.post_pangea_distance_radians
-            else:  # continent polygon is not a post-pangea COB ...
-                # Buffer/gap distance is constant (unchanged from pre-pangea).
+        if continent_feature_polygon.get_feature().get_reconstruction_plate_id() in self.ignore_ids:
+                buffer_and_gap_distance_radians = self.post_pangea_distance_radians
+        else:
+            if time >= 1400:
+                buffer_and_gap_distance_radians = math.radians(3.25)
+            elif time >= 1000:
+                interp = float(time - 1000) / (1400 - 1000)
+                buffer_and_gap_distance_radians = interp * math.radians(3.25) + (1 - interp) * self.pre_pangea_distance_radians
+            elif time >= 410:
                 buffer_and_gap_distance_radians = self.pre_pangea_distance_radians
+
+            # From 410 to 200 linearly interpolate between 2.25 degrees to 0 degrees, with the exception of the plate IDs in the attached list, which get interpolated 
+            # from 2.25deg at 410 Ma to 1.0 deg at 200 Ma.
+            elif time >= 200:
+                interp = float(time - 200) / (410 - 200)
+                if continent_feature_polygon.get_feature().get_reconstruction_plate_id() in self.post_pangea_COB_plate_IDs:
+                    buffer_and_gap_distance_radians = interp * math.radians(2.25) + (1 - interp) * math.radians(1.0)
+                else:
+                    buffer_and_gap_distance_radians = interp * math.radians(2.25) + (1 - interp) * self.post_pangea_distance_radians
+            # From 200-0 we use 0 degrees, except for the plate ID list for which we use 1.0 deg.        
+            else:  # time <= 200 ...
+                if continent_feature_polygon.get_feature().get_reconstruction_plate_id() in self.post_pangea_COB_plate_IDs:
+                    buffer_and_gap_distance_radians = math.radians(1.0)
+                else:
+                    buffer_and_gap_distance_radians = self.post_pangea_distance_radians
 
         return buffer_and_gap_distance_radians
 
-
 continent_polygon_buffer_and_gap_distance_radians = ContinentPolygonBufferAndGapDistanceRadians()
+
 
 ###########################
 # End of input parameters #
